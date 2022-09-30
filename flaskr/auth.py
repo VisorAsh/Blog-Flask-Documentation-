@@ -24,9 +24,9 @@ def load_logged_in_user():
     if user_id is None:
         g.user = None
     else:
-        g.user = get_db().execute(
-            'SELECT * FROM user WHERE id = ?', (user_id)
-        ).fetchone()
+        g.user = (
+            get_db().execute("SELECT * FROM user WHERE id = ?", (user_id,)).fetchone()
+        )
 
 @bp.route('/register', methods=('GET', 'POST'))
 def register():
@@ -46,16 +46,23 @@ def register():
             error = f"User {username} is already registered."
 
         if error is None:
-            db.execute(
-                'INSERT INTO user (username, password) VALUES (?, ?)'
-                (username, generate_password_hash(password))
-            )
-            db.commit()
-            return redirect(url_for('auth.login'))
+            try:
+                db.execute(
+                    "INSERT INTO user (username, password) VALUES (?, ?)",
+                    (username, generate_password_hash(password)),
+                )
+                db.commit()
+            except db.IntegrityError:
+                # The username was already taken, which caused the
+                # commit to fail. Show a validation error.
+                error = f"User {username} is already registered."
+            else:
+                # Success, go to the login page.
+                return redirect(url_for("auth.login"))
 
         flash(error)
-    
-    return render_template('auth/register.html')
+
+    return render_template("auth/register.html")
 
 @bp.route('/login', methods=('GET', 'POST'))
 def login():
